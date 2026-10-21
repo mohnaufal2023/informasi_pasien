@@ -30,16 +30,76 @@ const meals = [
   },
 ];
 
+type Bed = {
+  id: number;
+  bedCode: string;
+  roomName: string;
+  isActive: boolean;
+};
+
 export default function DashboardPage() {
   const [now, setNow] = useState<Date | null>(null);
   const [message, setMessage] = useState("");
+  const [bed, setBed] = useState<Bed | null>(null);
+  const [bedLoading, setBedLoading] = useState(true);
+  const [bedError, setBedError] = useState(false);
 
+  // Jam dan tanggal real-time
   useEffect(() => {
     const updateClock = () => setNow(new Date());
+
     updateClock();
 
     const timer = window.setInterval(updateClock, 1000);
+
     return () => window.clearInterval(timer);
+  }, []);
+
+  // Mengambil data tempat tidur dari API
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBed() {
+      try {
+        const response = await fetch("/api/beds");
+
+        if (!response.ok) {
+          throw new Error("Gagal mengambil data tempat tidur");
+        }
+
+        const activeBed: Bed = await response.json();
+
+if (!activeBed.isActive) {
+  throw new Error("Tempat tidur tidak aktif");
+}
+
+if (!cancelled) {
+  setBed(activeBed);
+  setBedError(false);
+}
+
+        if (!cancelled) {
+          setBed(activeBed ?? null);
+          setBedError(false);
+        }
+      } catch (error) {
+        console.error("Gagal memuat tempat tidur:", error);
+
+        if (!cancelled) {
+          setBedError(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setBedLoading(false);
+        }
+      }
+    }
+
+    loadBed();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const dateText = now
@@ -60,6 +120,14 @@ export default function DashboardPage() {
       }).format(now)
     : "--:--:--";
 
+  const locationText = bedLoading
+    ? "Memuat lokasi..."
+    : bedError
+      ? "Lokasi tidak tersedia"
+      : bed
+        ? `${bed.roomName} · ${bed.bedCode}`
+        : "Tempat tidur belum terdaftar";
+
   return (
     <main className="min-h-screen bg-[#f2f8f7] text-slate-800">
       {/* Header */}
@@ -69,10 +137,12 @@ export default function DashboardPage() {
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-3xl text-teal-700 shadow-sm">
               ✚
             </div>
+
             <div>
               <p className="text-xl font-extrabold tracking-wide sm:text-2xl">
                 RS AWAL BROS
               </p>
+
               <p className="mt-1 text-sm text-teal-50 sm:text-base">
                 Informasi Pelayanan Pasien
               </p>
@@ -84,10 +154,12 @@ export default function DashboardPage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-teal-100">
                 Lokasi tablet
               </p>
+
               <p className="mt-1 text-lg font-bold">
-                Kamar 506 · Bed 1
+                {locationText}
               </p>
             </div>
+
             <span className="rounded-full bg-emerald-300/20 px-3 py-1 text-xs font-bold text-emerald-100">
               ● Aktif
             </span>
@@ -138,7 +210,9 @@ export default function DashboardPage() {
 
           <div className="hidden rounded-2xl border border-teal-100 bg-white p-5 lg:block">
             <div className="mb-3 text-2xl text-teal-700">♡</div>
+
             <h2 className="font-bold">Kami siap membantu</h2>
+
             <p className="mt-2 text-sm leading-6 text-slate-500">
               Gunakan menu bantuan perawat untuk melihat informasi layanan.
             </p>
@@ -157,9 +231,11 @@ export default function DashboardPage() {
                 <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-teal-700">
                   Selamat datang
                 </p>
+
                 <h1 className="mt-3 text-2xl font-extrabold leading-tight text-slate-800 sm:text-3xl lg:text-4xl">
                   Informasi Perawatan Anda
                 </h1>
+
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">
                   Temukan jadwal makan dan informasi pelayanan selama Anda
                   menjalani perawatan di rumah sakit.
@@ -170,10 +246,14 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-teal-800">
                   Waktu saat ini
                 </p>
+
                 <p className="mt-2 text-3xl font-extrabold tabular-nums text-teal-900 sm:text-4xl">
                   {timeText}
                 </p>
-                <p className="mt-2 text-sm text-slate-500">{dateText}</p>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  {dateText}
+                </p>
               </div>
             </div>
 
@@ -182,15 +262,31 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-teal-700">
                   📍 Lokasi perawatan
                 </p>
-                <p className="mt-2 text-xl font-extrabold">Kamar 506</p>
-                <p className="mt-1 text-sm text-slate-500">Tempat tidur 1</p>
+
+                <p className="mt-2 text-xl font-extrabold">
+                  {bedLoading
+                    ? "Memuat lokasi..."
+                    : bedError
+                      ? "Lokasi tidak tersedia"
+                      : bed?.roomName ?? "Lokasi belum tersedia"}
+                </p>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  {bed
+                    ? `Kode tempat tidur: ${bed.bedCode}`
+                    : "Belum ada data tempat tidur"}
+                </p>
               </div>
 
               <div className="rounded-2xl bg-sky-50 p-5 sm:p-6">
                 <p className="text-sm font-medium text-sky-700">
                   🍽️ Informasi hari ini
                 </p>
-                <p className="mt-2 text-xl font-extrabold">Jadwal makan</p>
+
+                <p className="mt-2 text-xl font-extrabold">
+                  Jadwal makan
+                </p>
+
                 <p className="mt-1 text-sm text-slate-500">
                   Lihat waktu makan Anda di bawah.
                 </p>
@@ -208,13 +304,16 @@ export default function DashboardPage() {
                 <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-teal-700">
                   Kebutuhan harian
                 </p>
+
                 <h2 className="mt-2 text-2xl font-extrabold">
                   Jadwal Makan
                 </h2>
+
                 <p className="mt-2 text-sm text-slate-500 sm:text-base">
                   Jadwal makan harian pasien.
                 </p>
               </div>
+
               <span className="w-fit rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600">
                 {dateText}
               </span>
@@ -230,13 +329,16 @@ export default function DashboardPage() {
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm sm:h-16 sm:w-16 sm:text-3xl">
                       {meal.icon}
                     </div>
+
                     <div className="min-w-0">
                       <h3 className="text-lg font-extrabold sm:text-xl">
                         {meal.name}
                       </h3>
+
                       <p className="mt-1 text-sm text-slate-600 sm:text-base">
                         Pukul {meal.time}
                       </p>
+
                       <p className="mt-1 text-xs text-slate-500">
                         {meal.description}
                       </p>
@@ -257,7 +359,6 @@ export default function DashboardPage() {
             </p>
           </section>
 
-          
           {/* Informasi obat pasien */}
           <section
             id="informasi-obat"
@@ -284,7 +385,6 @@ export default function DashboardPage() {
               </span>
             </div>
 
-            {/* Peringatan data demo */}
             <div
               role="note"
               className="mt-6 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4"
@@ -299,15 +399,13 @@ export default function DashboardPage() {
                 </p>
 
                 <p className="mt-1 text-sm leading-6 text-amber-800">
-                  Ini hanya tampilan demonstrasi. Jadwal, dosis, dan
-                  status pemberian obat pasien yang sebenarnya belum
-                  tersedia. Jangan gunakan tampilan ini sebagai
-                  instruksi pengobatan.
+                  Ini hanya tampilan demonstrasi. Jadwal, dosis, dan status
+                  pemberian obat pasien yang sebenarnya belum tersedia.
+                  Jangan gunakan tampilan ini sebagai instruksi pengobatan.
                 </p>
               </div>
             </div>
 
-            {/* Ringkasan */}
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl bg-purple-50 p-5">
                 <div className="flex items-center gap-3">
@@ -346,7 +444,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Daftar jadwal */}
             <div className="mt-7">
               <h3 className="text-lg font-extrabold text-slate-800">
                 Jadwal pemberian obat
@@ -377,20 +474,18 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Informasi keselamatan */}
             <div className="mt-5 rounded-2xl border border-teal-100 bg-teal-50 p-4">
               <p className="font-bold text-teal-900">
                 Informasi keselamatan pasien
               </p>
 
               <p className="mt-2 text-sm leading-6 text-teal-800">
-                Pemberian obat tetap dilakukan dan dikonfirmasi oleh
-                tenaga medis yang berwenang. Informasi pada tablet
-                bukan pengganti instruksi dokter atau perawat.
+                Pemberian obat tetap dilakukan dan dikonfirmasi oleh tenaga
+                medis yang berwenang. Informasi pada tablet bukan pengganti
+                instruksi dokter atau perawat.
               </p>
             </div>
           </section>
-
 
           {/* Layanan pasien */}
           <section id="bantuan" className="space-y-4">
@@ -409,9 +504,11 @@ export default function DashboardPage() {
                 className="min-h-44 rounded-3xl bg-teal-700 p-6 text-left text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-200 sm:p-8"
               >
                 <span className="text-3xl">♡</span>
+
                 <span className="mt-4 block text-xl font-extrabold">
                   Bantuan Perawat
                 </span>
+
                 <span className="mt-2 block text-sm leading-6 text-teal-50">
                   Informasi untuk meminta bantuan petugas.
                 </span>
@@ -422,9 +519,11 @@ export default function DashboardPage() {
                 className="min-h-44 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8"
               >
                 <span className="text-3xl text-sky-700">✚</span>
+
                 <h3 className="mt-4 text-xl font-extrabold">
                   Informasi Dokter
                 </h3>
+
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   Informasi dokter akan ditampilkan setelah sumber data dan
                   jadwal resmi tersedia.
@@ -438,6 +537,7 @@ export default function DashboardPage() {
                 className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"
               >
                 <p>{message}</p>
+
                 <button
                   type="button"
                   onClick={() => setMessage("")}
